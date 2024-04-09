@@ -1,0 +1,69 @@
+/* In this query, I quantify the ratio of burritos to tacos on restaurant menus from each city. 
+I present this sorted by largest ratio to smallest.
+
+The data tables "locations" and "menu_options_prices" contain the following relevant columns:
+locations.id and menu_options_prices.id: A unique identifier for each specific physical restaurant. This disambiguates different instances of the same restaurant, e.g. multiple McDonald's, and links the two data tables.
+locations.city: The city in which a restaurant is located
+locations.name: The name of the restaurant, e.g., McDonald's or Subway
+menu_options_prices.menus_name: The name of the menu item which contains either "burrito" and/or "taco" in its name, e.g., "Bean Cheese Burrito", "Diablo Taco", and "Taco, Burritto Special #1".
+menu_options_prices.categories: The type of the restaurant, e.g., "Mexican deli", "art gallery", "Fast food".
+menu_options_prices.cuisine: The type of food associated with the restaurant, e.g., "Pizza", "Authentic Mexican", "Tex-Mex"
+NOTE!! There is overlap and a lack of specifiticity between categories and cuisine.
+*/
+
+/* This project requires a unique locations id in order to distinguish between different cities with the same name,  
+similar to how the unique restaurant id distinguishes between different locations of the same restaurant*/
+SELECT
+  -- I select data from a new location column, created to avoid misclassifying repeated cities
+  k.fulladdy,
+  -- Then I count the number of burrito and taco menu items by id, since id is the only link between Locations and menu_options_prices
+  COUNT(m.id) AS BurrOccurrences,
+  COUNT(n.id) AS TacoOccurrences,
+  --calculates the burrito/taco ratio, avoiding divide by zero errors
+  COUNT(m.id) * 1.0 / COUNT(n.id) AS RATIO 
+FROM
+-- Use location table to create k.full addy and calculate the desired ratio
+  locations l 
+-- match locations with burrito locations
+  LEFT JOIN 
+  (
+    SELECT
+      id
+    FROM
+      menu_options_prices
+    WHERE
+      menus_name LIKE '%burrito%'
+  ) m ON l.id = m.id
+  -- join match locations with taco locations 
+  LEFT JOIN 
+  (
+    SELECT
+      id
+    FROM
+      menu_options_prices
+    WHERE
+      menus_name LIKE '%taco%'
+  ) n ON l.id = n.id
+  -- match restaurant ids with ids in the new, unique location id table
+  LEFT JOIN  
+  (
+    SELECT
+      id,
+      /* creates a more unique city id by concatenating city name with province, 
+      since some different cities share the same name*/
+      CONCAT(city, province) AS fulladdy 
+    FROM
+      locations
+  ) k ON l.id = k.id
+GROUP BY
+-- group the ratios by those unique location names
+  k.fulladdy 
+HAVING
+--Exclude any cities without any burrito items on their menus
+  COUNT(m.id) > 0 
+  --Exclude any cities without any tacos items on their menus
+  AND COUNT(n.id) > 0  
+-- Sort from largest to smallest ratio
+ORDER BY
+  RATIO DESC;
+

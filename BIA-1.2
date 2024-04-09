@@ -1,0 +1,73 @@
+/* In this query, I assess which cities have the greatest number of authentic Mexican restaurants.
+The data tables "locations" and "menu_options_prices" contain the following relevant columns:
+locations.id and menu_options_prices.id: A unique identifier for each specific physical restaurant. This disambiguates different instances of the same restaurant, e.g. multiple McDonald's, and links the two data tables.
+locations.city: The city in which a restaurant is located
+locations.name: The name of the restaurant, e.g., McDonald's or Subway
+menu_options_prices.menus_name: The name of the menu item which contains either "burrito" and/or "taco" in its name, e.g., "Bean Cheese Burrito", "Diablo Taco", and "Taco, Burritto Special #1".
+menu_options_prices.categories: The type of the restaurant, e.g., "Mexican deli", "art gallery", "Fast food".
+menu_options_prices.cuisine: The type of food associated with the restaurant, e.g., "Pizza", "Authentic Mexican", "Tex-Mex"
+NOTE!! There is overlap and a lack of specifiticity between categories and cuisine.
+*/
+
+/* Because "authentic" is not well operationalized, I used the following criteria.
+ 1. The restauran has fewer than 5 locations, as authentic restaurants tend to have fewer expansions
+ 2. The restaurant appears in only 1 city, as a larger chain is less likely to be authentic,
+ 3. The cuisine/category includes the word Mexican, and
+ 4. The cuisine does not include specific non-authentic keywords "*/
+
+--Count how many restaurants are in each city that meet the following criteria
+SELECT
+  filtered_data.city,
+  COUNT(filtered_data.name) AS restaurant_count 
+FROM
+  (
+    --First, I select the names of each restaurant and each city
+    SELECT
+      l.name,
+      l.city,
+      -- Then I count unique restaurants
+      COUNT(DISTINCT l.id) AS loc_count 
+    FROM
+      Locations l --Within the table Locations
+      -- I use ids between the tables Locations and menu_options_prices to tally restaurants
+      INNER JOIN menu_options_prices m ON l.id = m.id 
+    WHERE
+      l.name IN (
+        -- I only match ids between tables if the name meets criteria for "authentic"
+        SELECT
+          name
+        FROM
+          Locations
+        GROUP BY
+          name
+        HAVING
+          COUNT(DISTINCT id) < 5 --fewer than 5 locations
+          AND COUNT(DISTINCT city) = 1 --only occur in 1 city
+      ) 
+      -- Then I only match names between tables if their "cuisine" description meets criteria that seem authentic.
+      AND (
+        cuisines LIKE '%Mexican%'
+        OR m.categories LIKE '%Mexican%'
+      )
+      and cuisines NOT LIKE '%Traditional American%'
+      and cuisines NOT LIKE '%contemporary American%'
+      and cuisines NOT LIKE '%Tex-mex%'
+      and cuisines NOT LIKE '%Fast Food%'
+      and cuisines NOT LIKE '%Italian%'
+      and cuisines NOT LIKE '%gastro pub%'
+      and cuisines NOT LIKE '%Thai%'
+      and cuisines NOT LIKE '%pizza%'
+      and cuisines NOT LIKE '%fusion%'
+      and cuisines NOT LIKE '%French%'
+      and cuisines NOT LIKE '%Belgian%'
+      and cuisines NOT LIKE '%Chinese%'
+      and cuisines NOT LIKE '%sushi%'
+      and m.categories NOT LIKE '%fast food%'
+    GROUP BY
+      l.name,
+      l.city
+  ) AS filtered_data
+GROUP BY
+  filtered_data.city
+ORDER BY
+  restaurant_count desc;
