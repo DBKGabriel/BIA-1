@@ -1,0 +1,40 @@
+/* In this query, I count the number of locations for each restaurant that had both tacos and burritos.
+The data tables "locations" and "menu_options_prices" contain the following relevant columns:
+locations.id and menu_options_prices.id: A unique identifier for each specific physical restaurant. This disambiguates different instances of the same restaurant, e.g. multiple McDonald's, and links the two data tables.
+locations.name: The name of the restaurant, e.g., McDonald's or Subway
+menu_options_prices.menus_name: The name of the menu item which contains either "burrito" and/or "taco" in its name, e.g., "Bean Cheese Burrito", "Diablo Taco", and "Taco, Burritto Special #1".
+*/
+
+ -- Grab and count names from the Locations table
+select
+  l.name,
+  count(l.name) AS Occurrences
+from
+-- Match restaurant ids with menu_options_prices ids, since that is the column linking the two tables
+  locations l 
+  join (
+    select
+      distinct id
+    from
+      menu_options_prices
+    where
+      menus_name LIKE '%burrito%'
+  ) m on l.id = m.id
+  join (
+    select
+      distinct id
+    from
+      menu_options_prices
+    where
+      menus_name LIKE '%taco%'
+    -- Remove any restaurants that don't match on both burrito and taco keywords
+  ) n on l.id = n.id 
+where
+  m.id IS NOT NULL
+  AND n.id IS NOT NULL 
+-- Show each restaurant's count
+GROUP BY
+  l.name 
+-- Sort restaurants with both items from most to least locations with both items
+ORDER BY
+  Occurrences DESC
